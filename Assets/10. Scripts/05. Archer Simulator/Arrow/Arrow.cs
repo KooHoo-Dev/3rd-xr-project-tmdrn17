@@ -114,7 +114,7 @@ namespace ArcherSimulator
         private void LateUpdate()
         {
             if (state != ArrowState.Stuck || stuckTo == null) return;
-            if (!stuckTo.gameObject.activeInHierarchy) // 꽂힌 표적이 파괴됨
+            if (stuckTo.gameObject.activeInHierarchy == false) // 꽂힌 표적이 파괴됨
             {
                 Despawn();
                 return;

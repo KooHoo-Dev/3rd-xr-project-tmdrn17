@@ -110,19 +110,19 @@ namespace ArcherSimulator.EditorTools
             Scene scene = SceneManager.GetActiveScene();
             if (scene.path != ScenePath)
             {
-                if (!EditorUtility.DisplayDialog("Archer Simulator", $"현재 씬이 '{ScenePath}'가 아닙니다.\n해당 씬을 열고 진행할까요?", "열기", "취소")) return;
-                if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+                if (EditorUtility.DisplayDialog("Archer Simulator", $"현재 씬이 '{ScenePath}'가 아닙니다.\n해당 씬을 열고 진행할까요?", "열기", "취소") == false) return;
+                if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo() == false) return;
                 scene = EditorSceneManager.OpenScene(ScenePath);
             }
 
-            if (!EditorUtility.DisplayDialog("Archer Simulator · 씬 기본 세팅",
+            if (EditorUtility.DisplayDialog("Archer Simulator · 씬 기본 세팅",
                     "기획서 + Throw Range 씬 규칙으로 레이아웃을 생성합니다.\n\n" +
                     "• 루트 Lights/Stage/Systems/Lobby/Range/Game Stages/UI와 기본 'Directional Light'·'Floor'는 지우고 다시 만듭니다.\n" +
                     "• XR Origin은 'XR' 루트 아래로 옮기고, 왼손 연속 이동·Jump를 끕니다.\n" +
                     "• 하늘·안개(Render Settings)를 Throw Range와 같게 맞춥니다.\n" +
                     "• Interaction Layer 3·4에 'Bow'·'Arrow' 이름을 등록합니다.\n" +
                     "• 이 씬을 Build Settings에 추가하고 저장합니다.",
-                    "생성", "취소")) return;
+                    "생성", "취소") == false) return;
 
             Run(scene);
         }
@@ -622,7 +622,7 @@ namespace ArcherSimulator.EditorTools
             };
             foreach (RectTransform child in board.Cast<Transform>().OfType<RectTransform>())
             {
-                if (!layout.TryGetValue(child.name, out Vector2 position)) continue;
+                if (layout.TryGetValue(child.name, out Vector2 position) == false) continue;
                 Undo.RecordObject(child, "Move Title Board Label");
                 child.anchoredPosition = position;
             }
@@ -1253,7 +1253,7 @@ namespace ArcherSimulator.EditorTools
             go.transform.localPosition = localPosition;
             go.transform.localScale = localScale;
             if (material != null) go.GetComponent<Renderer>().sharedMaterial = material;
-            if (!keepCollider) Object.DestroyImmediate(go.GetComponent<Collider>());
+            if (keepCollider == false) Object.DestroyImmediate(go.GetComponent<Collider>());
             return go;
         }
 
@@ -1309,7 +1309,7 @@ namespace ArcherSimulator.EditorTools
         {
             if (AssetDatabase.IsValidFolder(folder)) return;
             string parent = Path.GetDirectoryName(folder)?.Replace('\\', '/');
-            if (!string.IsNullOrEmpty(parent)) EnsureFolder(parent);
+            if (string.IsNullOrEmpty(parent) == false) EnsureFolder(parent);
             AssetDatabase.CreateFolder(parent, Path.GetFileName(folder));
         }
 
@@ -1434,7 +1434,7 @@ namespace ArcherSimulator.EditorTools
             GameObject cap = Prim(PrimitiveType.Cube, "Cap", bd, new Vector3(0f, h / 2f + 0.03f, 0.01f), new Vector3(w + 0.04f, 0.035f, 0.12f), wood, keepCollider: false);
             cap.transform.localRotation = Quaternion.Euler(-8f, 0f, 0f);
 
-            if (!posts) return;
+            if (posts == false) return;
             float top = h / 2f - 0.086f;
             float thickness = 0.07f / bd.lossyScale.x;
             for (int i = 0; i < 2; i++)

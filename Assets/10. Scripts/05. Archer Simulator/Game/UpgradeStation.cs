@@ -49,7 +49,7 @@ namespace ArcherSimulator
 
         private void Awake()
         {
-            if (!table.Load())
+            if (table.Load() == false)
                 Debug.LogError("[UpgradeStation] BowUpgrade.tsv를 읽지 못해 강화를 사용할 수 없습니다.", this);
         }
 
@@ -92,11 +92,11 @@ namespace ArcherSimulator
         /// <summary>강화 버튼. 거치대에 활이 있고 로비 상태이며 포인트가 충분할 때만 진행된다.</summary>
         public void TryUpgrade()
         {
-            if (!IsBowDocked || !IsUpgradeAllowed) return;
+            if (IsBowDocked == false || IsUpgradeAllowed == false) return;
             if (MaxLevel) return; // 최고 단계
 
             BowUpgradeDef next = table.Get(level + 1);
-            if (next == null || !PointWallet.TrySpend(next.Cost)) return; // 포인트 부족
+            if (next == null || PointWallet.TrySpend(next.Cost) == false) return; // 포인트 부족
 
             level++;
             if (bow != null) bow.ClearArrows(); // 이전 단계로 만들어 둔 화살·이펙트는 지운다
@@ -129,7 +129,7 @@ namespace ArcherSimulator
             if (upgradePanel != null) upgradePanel.SetActive(docked && allowed);
             if (hintText != null)
             {
-                hintText.gameObject.SetActive(!(docked && allowed));
+                hintText.gameObject.SetActive((docked && allowed) == false);
                 hintText.text = allowed ? HintDock : HintLocked;
             }
 
@@ -150,7 +150,7 @@ namespace ArcherSimulator
             if (currentText != null) currentText.text = $"현재  {current.DisplayName}\n{current.StatText}";
             
             if (nextText != null) nextText.text = MaxLevel ? "최고 단계입니다" : $"다음  {next.DisplayName}\n{next.StatText}{EffectText(next)}";
-            bool affordable = !MaxLevel && points >= next.Cost;
+            bool affordable = MaxLevel == false && points >= next.Cost;
             if (costText != null)
                 costText.text = MaxLevel ? "" :
                     affordable ? $"비용 {next.Cost:N0} P  (보유 {points:N0} P)" : $"비용 {next.Cost:N0} P  ·  {next.Cost - points:N0} P 부족";

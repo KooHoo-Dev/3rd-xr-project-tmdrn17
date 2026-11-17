@@ -74,7 +74,7 @@ namespace StudyXR.Common
 
         private void OnTogglePressed(InputAction.CallbackContext context)
         {
-            SetVisible(!visible);
+            SetVisible(visible == false);
         }
 
         private void Update()

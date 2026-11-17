@@ -67,7 +67,7 @@ namespace ArcherSimulator
         private bool CanUse(IXRInteractor interactor)
         {
             if (interactor is XRSocketInteractor || bow == null) return false;
-            if (!IsBowHeldByOtherHand(interactor)) return false;
+            if (IsBowHeldByOtherHand(interactor) == false) return false;
             if (interactor is IXRSelectInteractor selector && interactorsSelecting.Contains(selector)) return true; // 당기는 중
             return (interactor.transform.position - transform.position).sqrMagnitude <= grabRadius * grabRadius;
         }
@@ -77,7 +77,7 @@ namespace ArcherSimulator
             foreach (IXRSelectInteractor holder in bow.interactorsSelecting)
             {
                 if (holder is XRSocketInteractor) continue;
-                if (!ReferenceEquals(holder, interactor)) return true;
+                if (ReferenceEquals(holder, interactor) == false) return true;
             }
             return false;
         }
@@ -88,14 +88,15 @@ namespace ArcherSimulator
         /// </summary>
         private void Update()
         {
-            if (!directGrab || isSelected || bow == null || interactionManager == null) return;
+            if (directGrab == false || isSelected || bow == null || interactionManager == null) return;
 
             interactionManager.GetRegisteredInteractors(InteractorBuffer);
             foreach (IXRInteractor interactor in InteractorBuffer)
             {
-                if (!(interactor is XRBaseInputInteractor hand) || !hand.isActiveAndEnabled) continue;
-                if (hand.hasSelection || !hand.isSelectActive) continue;
-                if (!IsBowHeldByOtherHand(hand)) continue;
+                var hand = interactor as XRBaseInputInteractor;
+                if (hand == null || hand.isActiveAndEnabled == false) continue;
+                if (hand.hasSelection || hand.isSelectActive == false) continue;
+                if (IsBowHeldByOtherHand(hand) == false) continue;
 
                 float distance = Vector3.Distance(hand.transform.position, transform.position);
                 if (distance > grabRadius)
@@ -113,7 +114,7 @@ namespace ArcherSimulator
         public override void ProcessInteractable(XRInteractionUpdateOrder.UpdatePhase updatePhase)
         {
             base.ProcessInteractable(updatePhase);
-            if (updatePhase != XRInteractionUpdateOrder.UpdatePhase.Dynamic || !isSelected) return;
+            if (updatePhase != XRInteractionUpdateOrder.UpdatePhase.Dynamic || isSelected == false) return;
 
             IXRSelectInteractor hand = interactorsSelecting[0];
             Vector3 handPosition = hand.GetAttachTransform(this).position;

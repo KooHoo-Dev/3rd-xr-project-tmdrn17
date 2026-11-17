@@ -37,7 +37,7 @@ namespace Jay.FileIO
             {
                 using UnityWebRequest request = UnityWebRequest.Get(path);
                 UnityWebRequestAsyncOperation op = request.SendWebRequest();
-                while (!op.isDone) { } // APK 내부 로컬 파일이라 즉시 끝난다.
+                while (op.isDone == false) { } // APK 내부 로컬 파일이라 즉시 끝난다.
 
                 if (request.result != UnityWebRequest.Result.Success)
                 {

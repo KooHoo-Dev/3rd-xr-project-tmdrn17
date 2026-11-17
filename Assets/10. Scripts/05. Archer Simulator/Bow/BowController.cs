@@ -117,7 +117,7 @@ namespace ArcherSimulator
 
         /// <summary>활을 잡고 있는 손 (거치대 소켓 제외).</summary>
         public IXRSelectInteractor HoldingHand =>
-            grab.interactorsSelecting.FirstOrDefault(i => !(i is XRSocketInteractor));
+            grab.interactorsSelecting.FirstOrDefault(i => (i is XRSocketInteractor) == false);
 
         private void Awake()
         {
@@ -128,7 +128,7 @@ namespace ArcherSimulator
             // → 두 번째 손에게 남는 대상은 시위(BowString)뿐이라 시위가 잡힌다.
             grab.hoverFilters.Add(new XRHoverFilterDelegate((interactor, _) => CanHandTakeBow(interactor)));
             grab.selectFilters.Add(new XRSelectFilterDelegate((interactor, _) => CanHandTakeBow(interactor)));
-            bowColliders = GetComponentsInChildren<Collider>(true).Where(c => !c.isTrigger).ToArray();
+            bowColliders = GetComponentsInChildren<Collider>(true).Where(c => c.isTrigger == false).ToArray();
             drawStateHash = Animator.StringToHash(drawStateName);
             if (bowAnimator != null) bowAnimator.speed = 0f;
             if (levelVisuals != null && levelVisuals.Length > 0) SetVisualLevel(0);
@@ -204,7 +204,7 @@ namespace ArcherSimulator
         {
             if (nockedArrow != null || arrowPool == null) return;
             if (HoldingHand == null) return; // 활과 시위를 둘 다 잡았을 때만
-            if (CanNock != null && !CanNock()) return;
+            if (CanNock != null && CanNock() == false) return;
 
             nockedArrow = arrowPool.Get();
             if (nockedArrow == null) return; // 이번 라운드에 준비된 화살을 다 씀

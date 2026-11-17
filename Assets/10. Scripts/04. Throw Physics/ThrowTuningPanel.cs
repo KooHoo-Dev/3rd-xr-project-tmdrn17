@@ -46,7 +46,7 @@ namespace StudyXR.ThrowPhysics
 
         public void TogglePanel()
         {
-            if (panelRoot != null) panelRoot.SetActive(!panelRoot.activeSelf);
+            if (panelRoot != null) panelRoot.SetActive(panelRoot.activeSelf == false);
         }
 
         private void Start()
@@ -74,7 +74,7 @@ namespace StudyXR.ThrowPhysics
         {
             if (inputEnabled == false) return;
             if (panelAction.WasPressedThisFrame()) TogglePanel();
-            if (massAction.WasPressedThisFrame() && massAware != null) massAware.SetMassAware(!massAware.IsMassAware);
+            if (massAction.WasPressedThisFrame() && massAware != null) massAware.SetMassAware(massAware.IsMassAware == false);
         }
 
         private void LateUpdate()
