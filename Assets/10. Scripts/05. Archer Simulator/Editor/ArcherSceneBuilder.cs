@@ -914,14 +914,14 @@ namespace ArcherSimulator.EditorTools
         }
 
         /// <summary>
-        /// 강화 단계별 화살 효과: 이름, 화살 프리팹 (Arrow.prefab의 Variant + 촉에 Hovl 이펙트).
+        /// 강화 단계별 화살 효과: 이름, 화살 프리팹 (Hovl 투사체 이펙트 자체에 Arrow·Rigidbody·CapsuleCollider를 붙인 것).
         /// 0단계는 기본 Arrow.prefab.
         /// </summary>
         private static readonly (string name, string arrowPrefab)[] ArrowEffects =
         {
             ("기본 화살", null),
             ("자연의 섬광", PrefabFolder + "/Arrow Lv2.prefab"), // Projectile 1 nature arrow (VFX loop)
-            ("칼날 폭발", PrefabFolder + "/Arrow Lv3.prefab"),   // Projectile 8 dagger (반복 재생으로 덮어씀)
+            ("칼날 폭발", PrefabFolder + "/Arrow Lv3.prefab"),   // Projectile 8 dagger (반복 재생)
             ("용의 일격", PrefabFolder + "/Arrow Lv4.prefab"),   // Projectile dragon punch (VFX loop)
         };
 

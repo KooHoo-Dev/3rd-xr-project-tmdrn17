@@ -29514,9 +29514,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ArcherSimulator.ArrowPool
   arrowPrefab:
   - {fileID: 1639648203430201661, guid: ec573d0129fb30448bfc0cafe833c174, type: 3}
-  - {fileID: 5155551156326324386, guid: 14f212246cafe9723e48aa0d3b15962d, type: 3}
-  - {fileID: 2459646740540425085, guid: fd0b15d88e9ccbc77d11bcd496286648, type: 3}
-  - {fileID: 7516818709761054837, guid: f1d4ad901a72e98464a6bea95efd05cc, type: 3}
+  - {fileID: 5441155211447897071, guid: 5a70335ab7f77ed43bd591e24fd0b232, type: 3}
+  - {fileID: 7706529935968999908, guid: fd0b15d88e9ccbc77d11bcd496286648, type: 3}
+  - {fileID: 8894476183139625172, guid: f1d4ad901a72e98464a6bea95efd05cc, type: 3}
 --- !u!4 &1816763089
 Transform:
   m_ObjectHideFlags: 0
