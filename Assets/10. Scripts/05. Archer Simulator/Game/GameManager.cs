@@ -112,6 +112,8 @@ namespace ArcherSimulator
                 return;
             }
             Instance = this;
+            
+            PointWallet.Add(100000);
         }
 
         private void OnDestroy()
