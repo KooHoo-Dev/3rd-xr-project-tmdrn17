@@ -49,7 +49,7 @@ namespace ArcherSimulator
         {
             state = ArrowState.Nocked;
             stuckTo = null;
-            body.isKinematic = true;
+            MakeKinematic();
             SetColliders(false);
             SetEffects(true); // 이펙트가 곧 화살 몸체: 시위에 걸 때부터 처음부터 재생
 
@@ -74,6 +74,9 @@ namespace ArcherSimulator
 
             SetColliders(true);
             body.isKinematic = false;
+            // 빠른 화살이 얇은 표적을 뚫거나, 몸통·약점에 한 프레임에 같이 닿아 판정이 뒤섞이지 않게
+            // 날아가는 동안만 연속 충돌 감지를 쓴다 (먼저 닿은 면 = 앞에 튀어나온 약점이 먼저 잡힌다).
+            body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
             body.linearVelocity = velocity;
             body.angularVelocity = Vector3.zero;
         }
@@ -95,7 +98,7 @@ namespace ArcherSimulator
             state = ArrowState.Stuck;
             body.linearVelocity = Vector3.zero;
             body.angularVelocity = Vector3.zero;
-            body.isKinematic = true;
+            MakeKinematic();
             SetColliders(false);
 
             stuckTo = collision.transform;
@@ -127,8 +130,15 @@ namespace ArcherSimulator
             if (state == ArrowState.Idle) return;
             state = ArrowState.Idle;
             stuckTo = null;
-            body.isKinematic = true;
+            MakeKinematic();
             gameObject.SetActive(false);
+        }
+
+        /// <summary>물리를 멈춘다. 키네마틱은 연속 충돌 감지(ContinuousDynamic)를 못 쓰므로 Discrete로 먼저 되돌린다.</summary>
+        private void MakeKinematic()
+        {
+            body.collisionDetectionMode = CollisionDetectionMode.Discrete;
+            body.isKinematic = true;
         }
 
         private void SetColliders(bool on)
