@@ -26,6 +26,10 @@ namespace ArcherSimulator
         [SerializeField] private TMP_Text costText;
         [SerializeField] private Button upgradeButton;
 
+        [Header("타이틀 게시판")]
+        [SerializeField] private TMP_Text pointsText;
+        [SerializeField] private TMP_Text bowLevelText;
+
         [Tooltip("시작 강화 단계 (0 = Lv1). 단계별 수치는 StreamingAssets/BowUpgrade.tsv")]
         [SerializeField] private int level;
 
@@ -58,6 +62,7 @@ namespace ArcherSimulator
             }
             if (upgradeButton != null) upgradeButton.onClick.AddListener(TryUpgrade);
             if (Manager != null) Manager.StateChanged += OnGameStateChanged;
+            PointWallet.Changed += OnPointsChanged;
             Refresh();
         }
 
@@ -70,6 +75,7 @@ namespace ArcherSimulator
             }
             if (upgradeButton != null) upgradeButton.onClick.RemoveListener(TryUpgrade);
             if (Manager != null) Manager.StateChanged -= OnGameStateChanged;
+            PointWallet.Changed -= OnPointsChanged;
         }
 
         private void Start()
@@ -81,14 +87,17 @@ namespace ArcherSimulator
 
         private void OnSocketChanged(BaseInteractionEventArgs args) => Refresh();
         private void OnGameStateChanged(GameState state) => Refresh();
+        private void OnPointsChanged(int points) => Refresh();
 
-        /// <summary>강화 버튼. 거치대에 활이 있고 로비 상태일 때만 진행된다.</summary>
+        /// <summary>강화 버튼. 거치대에 활이 있고 로비 상태이며 포인트가 충분할 때만 진행된다.</summary>
         public void TryUpgrade()
         {
             if (!IsBowDocked || !IsUpgradeAllowed) return;
             if (MaxLevel) return; // 최고 단계
 
-            // TODO: 포인트 시스템이 생기면 next.Cost만큼 차감하고, 부족하면 막는다.
+            BowUpgradeDef next = table.Get(level + 1);
+            if (next == null || !PointWallet.TrySpend(next.Cost)) return; // 포인트 부족
+
             level++;
             if (bow != null) bow.ClearArrows(); // 이전 단계로 만들어 둔 화살·이펙트는 지운다
             ApplyLevelToBow();
@@ -126,6 +135,9 @@ namespace ArcherSimulator
 
             BowUpgradeDef current = CurrentLevel;
             BowUpgradeDef next = table.Get(MaxLevel ? level : level + 1);
+            int points = PointWallet.Points;
+            if (pointsText != null) pointsText.text = $"보유 포인트  {points:N0} P";
+            if (bowLevelText != null) bowLevelText.text = current != null ? $"현재 활  {current.DisplayName}" : "";
             if (current == null)
             {
                 if (currentText != null) currentText.text = "강화 데이터 없음";
@@ -138,8 +150,11 @@ namespace ArcherSimulator
             if (currentText != null) currentText.text = $"현재  {current.DisplayName}\n{current.StatText}";
             
             if (nextText != null) nextText.text = MaxLevel ? "최고 단계입니다" : $"다음  {next.DisplayName}\n{next.StatText}{EffectText(next)}";
-            if (costText != null) costText.text = MaxLevel ? "" : $"비용 {next.Cost:N0} P";
-            if (upgradeButton != null) upgradeButton.interactable = !MaxLevel;
+            bool affordable = !MaxLevel && points >= next.Cost;
+            if (costText != null)
+                costText.text = MaxLevel ? "" :
+                    affordable ? $"비용 {next.Cost:N0} P  (보유 {points:N0} P)" : $"비용 {next.Cost:N0} P  ·  {next.Cost - points:N0} P 부족";
+            if (upgradeButton != null) upgradeButton.interactable = affordable;
         }
     }
 }

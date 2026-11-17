@@ -9,6 +9,7 @@ namespace ArcherSimulator
     ///    강화 단계 화살 프리팹(Arrow Lv2~)은 화살 모델 대신 이펙트가 화살 몸체다. 시위에 걸 때부터 재생한다.
     /// 2) 땅(ArrowGround)에 닿으면 바로 꺼진다.
     /// 3) 그 밖의 물체에 닿으면 멈추고 콜라이더를 끈 뒤, 맞은 물체를 따라다닌다. 게임이 끝나면 꺼진다.
+    ///    표적(Target)이면 Damage만큼 데미지를 준다. 약점(TargetWeakPoint)이면 약점 명중.
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
     public class Arrow : MonoBehaviour
@@ -23,6 +24,9 @@ namespace ArcherSimulator
         private Transform stuckTo;
         private Vector3 stuckLocalPosition;
         private Quaternion stuckLocalRotation;
+
+        /// <summary>표적에 줄 데미지. 발사할 때 BowController가 정한다.</summary>
+        public float Damage { get; set; }
 
         private void Awake()
         {
@@ -97,11 +101,21 @@ namespace ArcherSimulator
             stuckTo = collision.transform;
             stuckLocalPosition = stuckTo.InverseTransformPoint(transform.position);
             stuckLocalRotation = Quaternion.Inverse(stuckTo.rotation) * transform.rotation;
+
+            // 표적이면 데미지 (약점 Collider면 약점 명중). 파괴되면 표적이 꺼지고 이 화살도 따라 꺼진다.
+            Target target = collision.collider.GetComponentInParent<Target>();
+            if (target != null)
+                target.TakeHit(Damage, collision.collider.GetComponentInParent<TargetWeakPoint>() != null);
         }
 
         private void LateUpdate()
         {
             if (state != ArrowState.Stuck || stuckTo == null) return;
+            if (!stuckTo.gameObject.activeInHierarchy) // 꽂힌 표적이 파괴됨
+            {
+                Despawn();
+                return;
+            }
             transform.SetPositionAndRotation(stuckTo.TransformPoint(stuckLocalPosition), stuckTo.rotation * stuckLocalRotation);
         }
 

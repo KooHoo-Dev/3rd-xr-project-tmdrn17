@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Serialization;
@@ -57,6 +58,9 @@ namespace ArcherSimulator
             new DifficultySetup { displayName = "어려움", distance = 35f, targetHp = 350, scoreMultiplier = 2.5f },
         };
 
+        [Header("점수 (기획서 임시 수치)")]
+        [SerializeField] private ScoreRule scoreRule = new ScoreRule();
+
         [Header("연결")]
         [SerializeField] private BowController bow;
 
@@ -72,6 +76,8 @@ namespace ArcherSimulator
         [SerializeField] private TMP_Text resultDetailText;
         [SerializeField] private TMP_Text resultTotalText;
         [SerializeField] private TMP_Text resultStatsText;
+        [Tooltip("결과 화면의 최고 기록 표시")]
+        [SerializeField] private TMP_Text resultRecordText;
 
         [Header("진행")]
         [SerializeField] private int countdownSeconds = 3;
@@ -82,7 +88,9 @@ namespace ArcherSimulator
         private int difficultyIndex;
         private int arrowsLeft;
         private int arrowsFired;
-        private int score;
+        private readonly RoundScore score = new RoundScore();
+        private Target[] stageTargets = Array.Empty<Target>(); // 현재 스테이지의 표적
+        private readonly Dictionary<(int stage, int difficulty), int> bestScores = new();
         private Coroutine flow;
 
         public GameState State { get; private set; } = GameState.Lobby;
@@ -94,6 +102,7 @@ namespace ArcherSimulator
         public StageSetup CurrentStage => stages[stageIndex];
         public DifficultySetup CurrentDifficulty => difficulties[difficultyIndex];
         public int ArrowsLeft => arrowsLeft;
+        public int Score => score.Total(scoreRule);
 
         private void Awake()
         {
@@ -116,6 +125,14 @@ namespace ArcherSimulator
             {
                 bow.CanNock = CanNockArrow;
                 bow.ArrowFired += OnArrowFired;
+            }
+
+            // 모든 스테이지의 표적 명중을 받는다 (현재 스테이지·Playing일 때만 점수 반영)
+            foreach (StageSetup stage in stages)
+            {
+                if (stage.targetSlots == null) continue;
+                foreach (Target target in stage.targetSlots.GetComponentsInChildren<Target>(true))
+                    target.Hit += OnTargetHit;
             }
 
             if (countdownText != null) countdownText.gameObject.SetActive(false);
@@ -152,6 +169,11 @@ namespace ArcherSimulator
                 stage.targetSlots.localPosition = new Vector3(p.x, p.y, CurrentDifficulty.distance);
             }
 
+            stageTargets = CurrentStage.targetSlots != null
+                ? CurrentStage.targetSlots.GetComponentsInChildren<Target>(true)
+                : Array.Empty<Target>();
+            ResetTargets();
+
             if (selectionText != null)
                 selectionText.text = $"선택: {CurrentStage.displayName} / {CurrentDifficulty.displayName}";
             UpdateHud();
@@ -170,7 +192,8 @@ namespace ArcherSimulator
         {
             arrowsLeft = CurrentStage.shots;
             arrowsFired = 0;
-            score = 0;
+            score.Reset(CurrentDifficulty.scoreMultiplier);
+            ResetTargets();
             if (bow != null) bow.PrepareArrows(CurrentStage.shots); // 최대 화살 수만큼 화살·이펙트 생성
             SetState(GameState.Ready);
 
@@ -216,6 +239,38 @@ namespace ArcherSimulator
             if (arrowsLeft == 0 && flow == null) flow = StartCoroutine(FinishAfterDelay());
         }
 
+        // ───────── 점수 ─────────
+
+        /// <summary>현재 스테이지 표적을 난이도 HP로 채우고 다시 켠다.</summary>
+        private void ResetTargets()
+        {
+            foreach (Target target in stageTargets)
+                if (target != null) target.ResetTarget(CurrentDifficulty.targetHp);
+        }
+
+        private void OnTargetHit(Target target, int damage, bool weakPoint)
+        {
+            if (State != GameState.Playing || Array.IndexOf(stageTargets, target) < 0) return;
+
+            score.Hits++;
+            if (weakPoint) score.WeakPointHits++;
+            if (target.IsDestroyed) score.TargetsDestroyed++;
+            UpdateHud();
+
+            if (score.TargetsDestroyed >= stageTargets.Length) EndRound(true); // 모든 표적 파괴
+        }
+
+        /// <summary>이번 플레이 동안의 스테이지·난이도별 최고 기록을 갱신하면 true. (저장하지 않음)</summary>
+        private bool UpdateBest(int total, out int best)
+        {
+            var key = (stageIndex, difficultyIndex);
+            bestScores.TryGetValue(key, out best);
+            if (total <= best) return false;
+            best = total;
+            bestScores[key] = best;
+            return true;
+        }
+
         private IEnumerator FinishAfterDelay()
         {
             yield return new WaitForSeconds(resultDelay);
@@ -223,21 +278,30 @@ namespace ArcherSimulator
             EndRound(false);
         }
 
-        /// <summary>라운드 종료. 표적 판정이 붙으면 모든 표적 파괴 시 EndRound(true)를 호출한다.</summary>
+        /// <summary>라운드 종료. 모든 표적을 부수면 true(클리어), 화살이 떨어지면 false.</summary>
         public void EndRound(bool cleared)
         {
             if (State != GameState.Playing) return;
             StopFlow();
             DespawnAllArrows();
+
+            score.ArrowsLeft = cleared ? arrowsLeft : 0; // 남은 화살 보너스는 클리어했을 때만
+            int total = score.Total(scoreRule);
+            bool newRecord = UpdateBest(total, out int best);
+            PointWallet.Add(total); // 획득 점수 = 강화 재료 포인트
+            int accuracy = arrowsFired > 0 ? Mathf.RoundToInt(100f * score.Hits / arrowsFired) : 0;
+
             SetState(GameState.Result);
 
             if (resultBoard != null) resultBoard.SetActive(true);
             if (resultTitleText != null) resultTitleText.text = cleared ? "클리어!" : "실패";
-            if (resultDetailText != null)
-                resultDetailText.text = $"{CurrentStage.displayName} · {CurrentDifficulty.displayName}\n" +
-                                        $"표적 거리 {CurrentDifficulty.distance:0}m · 표적 HP {CurrentDifficulty.targetHp}";
-            if (resultTotalText != null) resultTotalText.text = $"획득 점수  {score}";
-            if (resultStatsText != null) resultStatsText.text = $"발사 {arrowsFired}발  ·  남은 화살 {arrowsLeft}";
+            if (resultDetailText != null) resultDetailText.text = score.Breakdown(scoreRule);
+            if (resultTotalText != null) resultTotalText.text = $"획득 점수  {total:N0}";
+            if (resultStatsText != null)
+                resultStatsText.text = $"명중률 {accuracy}%  ·  발사 {arrowsFired}발  ·  남은 화살 {arrowsLeft}";
+            if (resultRecordText != null)
+                resultRecordText.text = (newRecord ? $"신기록!  최고 기록 {best:N0}" : $"최고 기록 {best:N0}") +
+                                        $"  ·  +{total:N0} P (보유 {PointWallet.Points:N0} P)";
         }
 
         /// <summary>결과 화면 '다시 하기'</summary>
@@ -257,6 +321,7 @@ namespace ArcherSimulator
             DespawnAllArrows();
             if (resultBoard != null) resultBoard.SetActive(false);
             if (countdownText != null) countdownText.gameObject.SetActive(false);
+            ResetTargets(); // 부서진 표적을 로비에서 다시 보이게
             SetState(GameState.Lobby);
         }
 
@@ -279,7 +344,7 @@ namespace ArcherSimulator
             if (arrowsText != null)
                 arrowsText.text = State == GameState.Lobby ? $"화살 {CurrentStage.shots}발" : $"화살 {arrowsLeft} / {CurrentStage.shots}";
             if (scoreText != null)
-                scoreText.text = State == GameState.Lobby ? CurrentDifficulty.displayName : $"점수 {score}";
+                scoreText.text = State == GameState.Lobby ? CurrentDifficulty.displayName : $"점수 {Score:N0}";
         }
     }
 }

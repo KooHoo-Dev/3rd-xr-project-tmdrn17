@@ -223,6 +223,7 @@ namespace ArcherSimulator
 
             Arrow arrow = nockedArrow;
             nockedArrow = null;
+            arrow.Damage = arrowDamage;
             arrow.Launch(transform.forward * (maxArrowSpeed * pull));
 
             BowString.SendHaptic(hand, fireHapticAmplitude, fireHapticDuration);

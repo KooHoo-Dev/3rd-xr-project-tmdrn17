@@ -86,7 +86,7 @@ namespace ArcherSimulator.EditorTools
             public static BowController Bow;
             public static XRBaseInteractable StartButton;
             public static TMP_Text BoardArrows, BoardScore, Selection;
-            public static TMP_Text ResultTitle, ResultDetail, ResultTotal, ResultStats;
+            public static TMP_Text ResultTitle, ResultDetail, ResultTotal, ResultStats, ResultRecord;
             public static GameObject ResultBoard;
             public static TMP_Text Countdown;
             public static Button Retry, Lobby;
@@ -98,7 +98,7 @@ namespace ArcherSimulator.EditorTools
             {
                 ArrowPool = null; Bow = null; StartButton = null;
                 BoardArrows = BoardScore = Selection = null;
-                ResultTitle = ResultDetail = ResultTotal = ResultStats = null;
+                ResultTitle = ResultDetail = ResultTotal = ResultStats = ResultRecord = null;
                 ResultBoard = null; Countdown = null; Retry = Lobby = null;
                 StageButtons.Clear(); DifficultyButtons.Clear(); Stages.Clear();
             }
@@ -452,6 +452,7 @@ namespace ArcherSimulator.EditorTools
             so.FindProperty("resultDetailText").objectReferenceValue = Refs.ResultDetail;
             so.FindProperty("resultTotalText").objectReferenceValue = Refs.ResultTotal;
             so.FindProperty("resultStatsText").objectReferenceValue = Refs.ResultStats;
+            so.FindProperty("resultRecordText").objectReferenceValue = Refs.ResultRecord;
 
             SerializedProperty stages = so.FindProperty("stages");
             for (int i = 0; i < Refs.Stages.Count && i < stages.arraySize; i++)
@@ -484,6 +485,7 @@ namespace ArcherSimulator.EditorTools
             {
                 var stationSo = new SerializedObject(station);
                 stationSo.FindProperty("gameManager").objectReferenceValue = manager;
+                WireTitleBoardLabels(stationSo);
                 stationSo.ApplyModifiedPropertiesWithoutUndo();
             }
         }
@@ -1111,6 +1113,82 @@ namespace ArcherSimulator.EditorTools
             fill.fillOrigin = (int)Image.OriginHorizontal.Left;
             fill.fillAmount = 1f;
             Label(bar, "HP Text", "100 / 100", 26f, new Vector2(0f, -10f), new Vector2(400f, 40f));
+
+            SetupTarget(t, undo: false);
+        }
+
+        /// <summary>표적 오브젝트에 Target·TargetWeakPoint를 붙이고 HP 바를 연결한다. 이미 있으면 연결만 다시 한다.</summary>
+        private static void SetupTarget(Transform t, bool undo)
+        {
+            Transform weak = t.Find("WeakPoint");
+            if (weak != null && weak.GetComponent<TargetWeakPoint>() == null)
+            {
+                if (undo) Undo.AddComponent<TargetWeakPoint>(weak.gameObject);
+                else weak.gameObject.AddComponent<TargetWeakPoint>();
+            }
+
+            Target target = t.GetComponent<Target>();
+            if (target == null) target = undo ? Undo.AddComponent<Target>(t.gameObject) : t.gameObject.AddComponent<Target>();
+
+            var so = new SerializedObject(target);
+            Transform fill = t.Find("HP Bar/Background/Fill");
+            Transform text = t.Find("HP Bar/HP Text");
+            so.FindProperty("hpFill").objectReferenceValue = fill != null ? fill.GetComponent<Image>() : null;
+            so.FindProperty("hpText").objectReferenceValue = text != null ? text.GetComponent<TMP_Text>() : null;
+            if (undo) so.ApplyModifiedProperties();
+            else so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>UpgradeStation의 pointsText·bowLevelText를 타이틀 게시판 라벨에 연결한다 (Apply는 호출한 쪽에서).</summary>
+        private static void WireTitleBoardLabels(SerializedObject stationSo)
+        {
+            Transform[] all = Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            TMP_Text Find(string name) =>
+                all.FirstOrDefault(t => t.name == name && t.parent != null && t.parent.name == "Title Board")?.GetComponent<TMP_Text>();
+            stationSo.FindProperty("pointsText").objectReferenceValue = Find("Points Text");
+            stationSo.FindProperty("bowLevelText").objectReferenceValue = Find("Bow Level Text");
+        }
+
+        /// <summary>
+        /// 씬 전체를 다시 만들지 않고, 현재 씬의 표적에 판정(Target)을 붙이고 결과 화면 최고 기록 줄을 GameManager에 연결한다.
+        /// </summary>
+        [MenuItem("Archer Simulator/표적 판정·점수·포인트 연결")]
+        public static void SetupTargetsAndScore()
+        {
+            Transform[] all = Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            var manager = Object.FindFirstObjectByType<GameManager>(FindObjectsInactive.Include);
+            Transform[] targets = all.Where(t => t.parent != null && t.parent.name == "Target Slots" && t.name.StartsWith("Target ")).ToArray();
+            if (manager == null || targets.Length == 0)
+            {
+                EditorUtility.DisplayDialog("Archer Simulator", "현재 씬에서 GameManager 또는 표적(Target Slots/Target NN)을 찾지 못했습니다.\n먼저 '씬 기본 세팅'을 실행하세요.", "확인");
+                return;
+            }
+
+            Undo.IncrementCurrentGroup();
+            int undoGroup = Undo.GetCurrentGroup();
+            Undo.SetCurrentGroupName("표적 판정·점수·포인트 연결");
+
+            foreach (Transform t in targets) SetupTarget(t, undo: true);
+
+            Transform record = all.FirstOrDefault(t => t.name == "Record Text" && t.parent != null && t.parent.name == "Result Board");
+            var so = new SerializedObject(manager);
+            so.FindProperty("resultRecordText").objectReferenceValue = record != null ? record.GetComponent<TMP_Text>() : null;
+            so.ApplyModifiedProperties();
+
+            // 강화 작업대 → 타이틀 게시판의 보유 포인트·현재 활 줄
+            foreach (UpgradeStation station in Object.FindObjectsByType<UpgradeStation>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                var stationSo = new SerializedObject(station);
+                WireTitleBoardLabels(stationSo);
+                stationSo.ApplyModifiedProperties();
+            }
+
+            Undo.CollapseUndoOperations(undoGroup);
+            Scene scene = manager.gameObject.scene;
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log($"[ArcherSceneBuilder] 표적 {targets.Length}개에 판정을 붙이고 점수·포인트 UI를 연결했습니다." +
+                      (record == null ? " (결과 화면 'Record Text'는 찾지 못함)" : ""));
         }
 
         // ───────────────────────── UI ─────────────────────────
@@ -1128,7 +1206,7 @@ namespace ArcherSimulator.EditorTools
                 24f, new Vector2(0f, 100f), new Vector2(700f, 170f));
             Refs.ResultTotal = Label(c, "Total Score Text", "획득 점수  350", 40f, new Vector2(0f, -25f), new Vector2(700f, 60f), color: new Color(0.6f, 0.9f, 1f));
             Refs.ResultStats = Label(c, "Stats Text", "명중률 0%  ·  남은 화살 0", 24f, new Vector2(0f, -90f), new Vector2(700f, 44f));
-            Label(c, "Record Text", "최고 기록 0  ·  보유 포인트 0 P", 24f, new Vector2(0f, -140f), new Vector2(700f, 44f), color: SubTextColor);
+            Refs.ResultRecord = Label(c, "Record Text", "최고 기록 0  ·  +0 P (보유 0 P)", 24f, new Vector2(0f, -140f), new Vector2(700f, 44f), color: SubTextColor);
             Refs.Retry = MakeButton(c, "Retry", "다시 하기", new Vector2(-150f, -230f), new Vector2(260f, 70f), 28f);
             Refs.Lobby = MakeButton(c, "Back To Lobby", "로비로", new Vector2(150f, -230f), new Vector2(260f, 70f), 28f);
             Refs.ResultBoard = c.gameObject;
