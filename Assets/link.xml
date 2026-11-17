@@ -1,0 +1,7 @@
+<linker>
+  <!-- IL2CPP(Quest) 코드 스트리핑으로 CsvHelper 리플렉션 매핑이 깨지지 않게 보존 -->
+  <assembly fullname="CsvHelper" preserve="all" />
+  <assembly fullname="Assembly-CSharp">
+    <type fullname="ArcherSimulator.BowUpgradeDTO" preserve="all" />
+  </assembly>
+</linker>

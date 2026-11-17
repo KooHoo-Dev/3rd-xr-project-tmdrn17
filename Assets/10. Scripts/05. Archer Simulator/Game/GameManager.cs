@@ -8,7 +8,7 @@ namespace ArcherSimulator
 {
     public enum GameState
     {
-        Lobby,   // 스테이지·난이도 선택, 강화 가능, 연습 사격 가능
+        Lobby,   // 스테이지·난이도 선택, 강화 가능 (사격 불가)
         Ready,   // 3초 카운트다운
         Playing, // 사격 (화살 수 제한)
         Result,  // 결과 화면
@@ -64,10 +64,8 @@ namespace ArcherSimulator
         [SerializeField] private TMP_Text selectionText;
         [SerializeField] private TMP_Text countdownText;
         [Tooltip("타이틀 게시판의 남은 화살 표시")]
-        [FormerlySerializedAs("wristArrowsText")]
         [SerializeField] private TMP_Text arrowsText;
         [Tooltip("타이틀 게시판의 점수 표시")]
-        [FormerlySerializedAs("wristScoreText")]
         [SerializeField] private TMP_Text scoreText;
         [SerializeField] private GameObject resultBoard;
         [SerializeField] private TMP_Text resultTitleText;
@@ -173,6 +171,7 @@ namespace ArcherSimulator
             arrowsLeft = CurrentStage.shots;
             arrowsFired = 0;
             score = 0;
+            if (bow != null) bow.PrepareArrows(CurrentStage.shots); // 최대 화살 수만큼 화살·이펙트 생성
             SetState(GameState.Ready);
 
             if (countdownText != null)
@@ -196,10 +195,15 @@ namespace ArcherSimulator
             flow = null;
         }
 
-        private bool CanNockArrow()
+        /// <summary>게임 중(Playing)이고 화살이 남았을 때만 장전할 수 있다. 로비에서는 쏠 수 없다.</summary>
+        private bool CanNockArrow() => State == GameState.Playing && arrowsLeft > 0;
+
+        /// <summary>게임 종료: 당기던 화살과 날아가는·꽂힌 화살을 모두 끈다.</summary>
+        private void DespawnAllArrows()
         {
-            if (State == GameState.Lobby) return true; // 로비: 연습 사격
-            return State == GameState.Playing && arrowsLeft > 0;
+            if (bow == null) return;
+            bow.CancelDraw();
+            if (bow.ArrowPool != null) bow.ArrowPool.DespawnAll();
         }
 
         private void OnArrowFired(Arrow arrow, float pull)
@@ -224,6 +228,7 @@ namespace ArcherSimulator
         {
             if (State != GameState.Playing) return;
             StopFlow();
+            DespawnAllArrows();
             SetState(GameState.Result);
 
             if (resultBoard != null) resultBoard.SetActive(true);
@@ -249,6 +254,7 @@ namespace ArcherSimulator
         {
             if (State == GameState.Lobby) return;
             StopFlow();
+            DespawnAllArrows();
             if (resultBoard != null) resultBoard.SetActive(false);
             if (countdownText != null) countdownText.gameObject.SetActive(false);
             SetState(GameState.Lobby);
@@ -271,7 +277,7 @@ namespace ArcherSimulator
         private void UpdateHud()
         {
             if (arrowsText != null)
-                arrowsText.text = State == GameState.Lobby ? "연습 사격" : $"화살 {arrowsLeft} / {CurrentStage.shots}";
+                arrowsText.text = State == GameState.Lobby ? $"화살 {CurrentStage.shots}발" : $"화살 {arrowsLeft} / {CurrentStage.shots}";
             if (scoreText != null)
                 scoreText.text = State == GameState.Lobby ? CurrentDifficulty.displayName : $"점수 {score}";
         }

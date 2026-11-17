@@ -28,6 +28,13 @@ namespace ArcherSimulator
             public Transform stringRest;
         }
 
+        /// <summary>화살 효과 한 단계의 이름 (강화 메뉴 표시용). 이펙트 자체는 ArrowPool의 단계별 화살 프리팹에 들어 있다.</summary>
+        [Serializable]
+        public class ArrowEffectVisual
+        {
+            public string displayName;
+        }
+
         [Header("연결")]
         [SerializeField] private BowString bowString;
         [SerializeField] private ArrowPool arrowPool;
@@ -36,6 +43,9 @@ namespace ArcherSimulator
         [Header("레벨별 외형 (Lv1, Lv2, Lv3 …)")]
         [Tooltip("모델이 없는 단계(예: Lv4)는 마지막 외형을 그대로 쓴다.")]
         [SerializeField] private LevelVisual[] levelVisuals;
+
+        [Header("화살 효과 (TSV의 ArrowEffect = 인덱스. 0 = 효과 없음)")]
+        [SerializeField] private ArrowEffectVisual[] arrowEffects;
 
         [Header("발사")]
         [SerializeField] private float maxArrowSpeed = 25f;
@@ -69,6 +79,41 @@ namespace ArcherSimulator
         public float MaxArrowSpeed { get => maxArrowSpeed; set => maxArrowSpeed = Mathf.Max(0f, value); }
         public float ArrowDamage { get => arrowDamage; set => arrowDamage = Mathf.Max(0f, value); }
         public bool IsDrawing => bowString != null && bowString.isSelected;
+
+        /// <summary>현재 화살 효과 단계 (UpgradeStation이 TSV의 ArrowEffect로 지정).</summary>
+        public int ArrowEffect { get; set; }
+
+        /// <summary>효과 단계의 표시 이름. 목록에 없으면 빈 문자열.</summary>
+        public string GetArrowEffectName(int effect)
+        {
+            ArrowEffectVisual visual = GetArrowEffect(effect);
+            return visual != null ? visual.displayName : "";
+        }
+
+        /// <summary>현재 강화 단계의 화살을 라운드 화살 수만큼 미리 만든다 (게임 시작 시).</summary>
+        public void PrepareArrows(int count)
+        {
+            if (arrowPool == null) return;
+            arrowPool.Prepare(count, ArrowEffect);
+        }
+
+        /// <summary>이전 단계로 만들어 둔 화살을 모두 지운다 (강화 시).</summary>
+        public void ClearArrows()
+        {
+            ReturnNockedArrow();
+            if (arrowPool != null) arrowPool.Clear();
+        }
+
+        private ArrowEffectVisual GetArrowEffect(int effect) =>
+            arrowEffects != null && effect >= 0 && effect < arrowEffects.Length ? arrowEffects[effect] : null;
+        public ArrowPool ArrowPool => arrowPool;
+
+        /// <summary>당기는 중이면 걸린 화살을 끄고 시위를 놓게 한다 (게임 종료 시).</summary>
+        public void CancelDraw()
+        {
+            ReturnNockedArrow();
+            if (bowString != null && bowString.isSelected) bowString.ForceRelease();
+        }
 
         /// <summary>활을 잡고 있는 손 (거치대 소켓 제외).</summary>
         public IXRSelectInteractor HoldingHand =>
@@ -158,10 +203,12 @@ namespace ArcherSimulator
         private void OnStringGrabbed()
         {
             if (nockedArrow != null || arrowPool == null) return;
+            if (HoldingHand == null) return; // 활과 시위를 둘 다 잡았을 때만
             if (CanNock != null && !CanNock()) return;
 
             nockedArrow = arrowPool.Get();
-            nockedArrow.Nock(bowColliders, arrowDamage);
+            if (nockedArrow == null) return; // 이번 라운드에 준비된 화살을 다 씀
+            nockedArrow.Nock(bowColliders);
             FollowNock();
         }
 

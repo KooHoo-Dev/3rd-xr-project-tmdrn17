@@ -1,0 +1,5 @@
+Level	DisplayName	Range	Damage	Cost	ArrowSpeed	ArrowEffect	VisualLevel
+0	Lv1 나무 활	20	40	0	25	0	0
+1	Lv2 강화 나무 활	30	60	500	32	1	1
+2	Lv3 철제 활	40	85	1200	40	2	2
+3	Lv4 정령의 활	55	120	2500	50	3	2

@@ -1,44 +1,78 @@
+using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Pool;
 
 namespace ArcherSimulator
 {
-    /// <summary>화살 오브젝트 풀 — Instantiate/Destroy 대신 재사용해 VR 프레임 드랍을 막는다.</summary>
+    /// <summary>
+    /// 라운드용 화살 묶음.
+    /// 게임을 시작하면 현재 강화 단계의 화살 프리팹으로 최대 화살 수만큼 미리 만들어 꺼 두고(Prepare),
+    /// 시위에 걸 때 하나씩 켜서 쓰며(Get), 게임이 끝나면 모두 끈다(DespawnAll).
+    /// 강화하면 이전 단계 화살을 모두 지운다(Clear). 이펙트는 화살 프리팹 안에 들어 있어 화살과 함께 재사용된다.
+    /// </summary>
     public class ArrowPool : MonoBehaviour
     {
-        [SerializeField] private Arrow arrowPrefab;
-        [SerializeField] private int prewarmCount = 12;
-        [SerializeField] private int maxSize = 40;
+        [Tooltip("강화 단계별 화살 프리팹 (TSV의 ArrowEffect = 인덱스). 없는 단계는 마지막 프리팹을 쓴다.")]
+        [SerializeField] private Arrow[] arrowPrefab;
 
-        private ObjectPool<Arrow> pool;
+        private readonly List<Arrow> arrows = new List<Arrow>();
+        private int preparedEffect = -1;
 
-        private void Awake()
+        /// <summary>
+        /// 최대 화살 수만큼 준비한다. 모자라면 새로 만들고, 전부 꺼진 상태로 둔다.
+        /// 이전에 다른 단계로 만들어 둔 화살이 있으면 지우고 새로 만든다.
+        /// </summary>
+        public void Prepare(int count, int effect)
         {
-            pool = new ObjectPool<Arrow>(Create, OnGet, OnRelease, OnDestroyArrow, false, prewarmCount, maxSize);
+            if (effect != preparedEffect) Clear();
+            DespawnAll();
+            preparedEffect = effect;
 
-            var warm = new Arrow[prewarmCount];
-            for (int i = 0; i < prewarmCount; i++) warm[i] = pool.Get();
-            foreach (Arrow arrow in warm) pool.Release(arrow);
+            Arrow prefab = GetArrowPrefab(effect);
+            if (prefab == null)
+            {
+                Debug.LogError("[ArrowPool] 화살 프리팹이 연결되지 않았습니다.", this);
+                return;
+            }
+
+            while (arrows.Count < count)
+            {
+                Arrow arrow = Instantiate(prefab, transform);
+                arrow.gameObject.SetActive(false);
+                arrows.Add(arrow);
+            }
         }
 
-        public Arrow Get() => pool.Get();
-
-        public void Release(Arrow arrow)
+        /// <summary>꺼져 있는 화살 하나를 켜서 돌려준다. 남은 화살이 없으면 null.</summary>
+        public Arrow Get()
         {
-            if (arrow == null) return;
-            arrow.transform.SetParent(transform, false);
-            pool.Release(arrow);
+            foreach (Arrow arrow in arrows)
+            {
+                if (arrow.gameObject.activeSelf) continue;
+                arrow.gameObject.SetActive(true);
+                return arrow;
+            }
+            return null;
         }
 
-        private Arrow Create()
+        /// <summary>날아가는 중·꽂힌 화살까지 모두 끈다 (게임 종료).</summary>
+        public void DespawnAll()
         {
-            Arrow arrow = Instantiate(arrowPrefab, transform);
-            arrow.SetPool(this);
-            return arrow;
+            foreach (Arrow arrow in arrows) arrow.Despawn();
         }
 
-        private static void OnGet(Arrow arrow) => arrow.gameObject.SetActive(true);
-        private static void OnRelease(Arrow arrow) => arrow.gameObject.SetActive(false);
-        private static void OnDestroyArrow(Arrow arrow) => Destroy(arrow.gameObject);
+        /// <summary>만들어 둔 화살을 모두 지운다 (강화로 단계가 바뀔 때).</summary>
+        public void Clear()
+        {
+            foreach (Arrow arrow in arrows) if (arrow != null) Destroy(arrow.gameObject);
+            arrows.Clear();
+            preparedEffect = -1;
+        }
+
+        private Arrow GetArrowPrefab(int effect)
+        {
+            if (arrowPrefab == null || arrowPrefab.Length == 0) return null;
+            Arrow prefab = arrowPrefab[Mathf.Clamp(effect, 0, arrowPrefab.Length - 1)];
+            return prefab != null ? prefab : arrowPrefab[0];
+        }
     }
 }

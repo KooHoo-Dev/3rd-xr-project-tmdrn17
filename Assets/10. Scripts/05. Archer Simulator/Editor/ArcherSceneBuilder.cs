@@ -124,6 +124,23 @@ namespace ArcherSimulator.EditorTools
                     "• 이 씬을 Build Settings에 추가하고 저장합니다.",
                     "생성", "취소")) return;
 
+            Run(scene);
+        }
+
+        /// <summary>확인 창 없이 바로 생성한다. 현재 열린 씬이 Archer Simulator 씬이어야 한다 (자동화용).</summary>
+        public static void RunWithoutPrompt()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            if (scene.path != ScenePath)
+            {
+                Debug.LogError($"[ArcherSceneBuilder] 현재 씬이 '{ScenePath}'가 아니라 실행하지 않았습니다.");
+                return;
+            }
+            Run(scene);
+        }
+
+        private static void Run(Scene scene)
+        {
             Undo.IncrementCurrentGroup();
             int undoGroup = Undo.GetCurrentGroup();
             Undo.SetCurrentGroupName("Archer Simulator 씬 기본 세팅");
@@ -343,6 +360,7 @@ namespace ArcherSimulator.EditorTools
 
             // Synty 바닥 타일 (10.4m 격자, y -0.25) — x -20.8~20.8, z -10.4~52
             Transform ground = Child(r, "Ground");
+            ground.gameObject.AddComponent<ArrowGround>(); // 화살이 닿으면 바로 꺼지는 땅
             for (int ix = -2; ix <= 2; ix++)
             for (int iz = -1; iz <= 5; iz++)
                 Prop("Environments/SM_Env_Ground_Flat_01.prefab", ground, new Vector3(ix * GroundTile, -0.25f, iz * GroundTile), 0f);
@@ -355,10 +373,12 @@ namespace ArcherSimulator.EditorTools
             GameObject floor = Prim(PrimitiveType.Plane, "Floor Collider", r, Vector3.zero, new Vector3(0.6f, 1f, 0.6f), null);
             Object.DestroyImmediate(floor.GetComponent<MeshRenderer>());
             floor.AddComponent<TeleportationArea>().interactionLayers = 1 << TeleportLayer;
+            floor.AddComponent<ArrowGround>();
 
             // 사거리 바닥 콜라이더: 화살이 떨어지는 면. 텔레포트 불가 — 사격 중 시점 고정.
             GameObject range = Prim(PrimitiveType.Plane, "Range Collider", r, new Vector3(0f, -0.001f, 20.8f), new Vector3(5.2f, 1f, 7.3f), null);
             Object.DestroyImmediate(range.GetComponent<MeshRenderer>());
+            range.AddComponent<ArrowGround>();
 
             // 배경
             Transform scenery = Child(r, "Scenery");
@@ -399,12 +419,16 @@ namespace ArcherSimulator.EditorTools
             if (mainCamera != null) so.FindProperty("head").objectReferenceValue = mainCamera.transform;
             so.ApplyModifiedPropertiesWithoutUndo();
 
-            // 화살 풀
+            // 화살 묶음 (게임 시작 시 최대 화살 수만큼 생성)
             Arrow arrowPrefab = BuildArrowPrefab();
             Transform poolTf = Child(root.transform, "Arrow Pool");
             Refs.ArrowPool = poolTf.gameObject.AddComponent<ArrowPool>();
             var poolSo = new SerializedObject(Refs.ArrowPool);
-            poolSo.FindProperty("arrowPrefab").objectReferenceValue = arrowPrefab;
+            // 강화 단계(ArrowEffect)별 화살 프리팹 (Arrow, Arrow Lv2~Lv4)
+            SerializedProperty arrowPrefabs = poolSo.FindProperty("arrowPrefab");
+            arrowPrefabs.arraySize = ArrowEffects.Length;
+            for (int i = 0; i < ArrowEffects.Length; i++)
+                arrowPrefabs.GetArrayElementAtIndex(i).objectReferenceValue = LoadLevelArrow(i, arrowPrefab);
             poolSo.ApplyModifiedPropertiesWithoutUndo();
 
             Child(root.transform, "Game Manager").gameObject.AddComponent<GameManager>(); // WireGame에서 연결
@@ -497,10 +521,7 @@ namespace ArcherSimulator.EditorTools
                 shaft.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             }
 
-            var arrow = root.AddComponent<Arrow>();
-            var so = new SerializedObject(arrow);
-            so.FindProperty("length").floatValue = ArrowLength;
-            so.ApplyModifiedPropertiesWithoutUndo();
+            root.AddComponent<Arrow>();
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(root, $"{PrefabFolder}/Arrow.prefab");
             Object.DestroyImmediate(root);
@@ -546,11 +567,11 @@ namespace ArcherSimulator.EditorTools
                 color: SubTextColor);
         }
 
-        /// <summary>타이틀 게시판의 진행 상황 줄 (남은 화살 · 점수). 로비에서는 연습 사격 / 난이도.</summary>
+        /// <summary>타이틀 게시판의 진행 상황 줄 (남은 화살 · 점수). 로비에서는 화살 수 / 난이도.</summary>
         private static void BuildBoardStatus(RectTransform board)
         {
             UIImage(board, "Status Divider", new Color(1f, 1f, 1f, 0.15f), new Vector2(660f, 3f), new Vector2(0f, -5f));
-            Refs.BoardArrows = Label(board, "Arrows Text", "연습 사격", 34f, new Vector2(-170f, -55f), new Vector2(330f, 60f));
+            Refs.BoardArrows = Label(board, "Arrows Text", "화살 10발", 34f, new Vector2(-170f, -55f), new Vector2(330f, 60f));
             Refs.BoardScore = Label(board, "Score Text", "쉬움", 34f, new Vector2(170f, -55f), new Vector2(330f, 60f), color: AccentColor);
         }
 
@@ -873,8 +894,34 @@ namespace ArcherSimulator.EditorTools
                 element.FindPropertyRelative("animator").objectReferenceValue = levels[i].animator;
                 element.FindPropertyRelative("stringRest").objectReferenceValue = levels[i].stringRest;
             }
+
+            // 화살 효과 이름 (TSV ArrowEffect 0~3). 이펙트는 단계별 화살 프리팹에 들어 있다.
+            SerializedProperty effects = so.FindProperty("arrowEffects");
+            effects.arraySize = ArrowEffects.Length;
+            for (int i = 0; i < ArrowEffects.Length; i++)
+                effects.GetArrayElementAtIndex(i).FindPropertyRelative("displayName").stringValue = ArrowEffects[i].name;
             so.ApplyModifiedProperties();
         }
+
+        /// <summary>단계 화살 프리팹. 없으면 기본 화살.</summary>
+        private static Arrow LoadLevelArrow(int effect, Arrow fallback)
+        {
+            string path = ArrowEffects[effect].arrowPrefab;
+            Arrow arrow = path != null ? AssetDatabase.LoadAssetAtPath<Arrow>(path) : null;
+            return arrow != null ? arrow : fallback;
+        }
+
+        /// <summary>
+        /// 강화 단계별 화살 효과: 이름, 화살 프리팹 (Arrow.prefab의 Variant + 촉에 Hovl 이펙트).
+        /// 0단계는 기본 Arrow.prefab.
+        /// </summary>
+        private static readonly (string name, string arrowPrefab)[] ArrowEffects =
+        {
+            ("기본 화살", null),
+            ("자연의 섬광", PrefabFolder + "/Arrow Lv2.prefab"), // Projectile 1 nature arrow (VFX loop)
+            ("칼날 폭발", PrefabFolder + "/Arrow Lv3.prefab"),   // Projectile 8 dagger (반복 재생으로 덮어씀)
+            ("용의 일격", PrefabFolder + "/Arrow Lv4.prefab"),   // Projectile dragon punch (VFX loop)
+        };
 
         /// <summary>
         /// 씬 전체를 다시 만들지 않고, 현재 씬의 활 외형만 레벨별(Lv1~Lv3) 모델로 바꾼다.

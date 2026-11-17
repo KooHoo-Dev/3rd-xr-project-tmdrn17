@@ -129,11 +129,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a374504230900354da03b63bdf2d3df7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ArcherSimulator.Arrow
-  length: 0.8
-  embedDepth: 0.12
-  dragCoefficient: 0.003
-  maxFlightTime: 8
-  lifetimeAfterHit: 5
 --- !u!1 &7241444607839439332
 GameObject:
   m_ObjectHideFlags: 0

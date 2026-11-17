@@ -1,4 +1,3 @@
-using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -10,21 +9,10 @@ namespace ArcherSimulator
     /// <summary>
     /// 강화 작업대. 거치대 소켓에 활이 올라가 있고, 로비 상태일 때만 강화 메뉴가 열린다.
     /// 게임을 시작하면(GameManager.CanUpgrade == false) 활을 올려놔도 강화가 진행되지 않는다.
+    /// 단계별 수치는 StreamingAssets/BowUpgrade.tsv에서 읽는다 (BowUpgradeTable).
     /// </summary>
     public class UpgradeStation : MonoBehaviour
     {
-        [Serializable]
-        public class BowLevel
-        {
-            public string displayName;
-            public float range;
-            public int damage;
-            public int cost;
-            [Tooltip("최대 당김 시 화살 속도 (m/s)")]
-            public float arrowSpeed;
-            public string effect;
-        }
-
         [Header("연결")]
         [SerializeField] private GameManager gameManager;
         [SerializeField] private XRSocketInteractor bowSocket;
@@ -38,26 +26,28 @@ namespace ArcherSimulator
         [SerializeField] private TMP_Text costText;
         [SerializeField] private Button upgradeButton;
 
-        [Header("활 단계 (기획서 4. 임시 수치)")]
-        [SerializeField] private BowLevel[] levels =
-        {
-            new BowLevel { displayName = "Lv1 나무 활", range = 20f, damage = 40, cost = 0, arrowSpeed = 25f, effect = "기본 화살" },
-            new BowLevel { displayName = "Lv2 강화 나무 활", range = 30f, damage = 60, cost = 500, arrowSpeed = 32f, effect = "흰색 트레일" },
-            new BowLevel { displayName = "Lv3 철제 활", range = 40f, damage = 85, cost = 1200, arrowSpeed = 40f, effect = "불꽃 트레일 + 작은 폭발" },
-            new BowLevel { displayName = "Lv4 정령의 활", range = 55f, damage = 120, cost = 2500, arrowSpeed = 50f, effect = "번개 트레일 + 큰 폭발" },
-        };
-
+        [Tooltip("시작 강화 단계 (0 = Lv1). 단계별 수치는 StreamingAssets/BowUpgrade.tsv")]
         [SerializeField] private int level;
+
+        private readonly BowUpgradeTable table = new();
 
         private const string HintDock = "활을 거치대에 올려두면\n강화 메뉴가 열립니다";
         private const string HintLocked = "게임 진행 중에는\n강화할 수 없습니다";
 
         public int Level => level;
-        public BowLevel CurrentLevel => levels[level];
+        public BowUpgradeTable Table => table;
+        public BowUpgradeDef CurrentLevel => table.Get(level);
+        public bool MaxLevel => level >= table.MaxLevel;
 
         private GameManager Manager => gameManager != null ? gameManager : GameManager.Instance;
         private bool IsBowDocked => bowSocket != null && bowSocket.hasSelection;
         private bool IsUpgradeAllowed => Manager == null || Manager.CanUpgrade;
+
+        private void Awake()
+        {
+            if (!table.Load())
+                Debug.LogError("[UpgradeStation] BowUpgrade.tsv를 읽지 못해 강화를 사용할 수 없습니다.", this);
+        }
 
         private void OnEnable()
         {
@@ -84,7 +74,7 @@ namespace ArcherSimulator
 
         private void Start()
         {
-            level = Mathf.Clamp(level, 0, levels.Length - 1);
+            level = Mathf.Clamp(level, 0, Mathf.Max(0, table.MaxLevel));
             ApplyLevelToBow();
             Refresh();
         }
@@ -96,20 +86,30 @@ namespace ArcherSimulator
         public void TryUpgrade()
         {
             if (!IsBowDocked || !IsUpgradeAllowed) return;
-            if (level >= levels.Length - 1) return;
+            if (MaxLevel) return; // 최고 단계
 
-            // TODO: 포인트 시스템이 생기면 levels[level + 1].cost만큼 차감하고, 부족하면 막는다.
+            // TODO: 포인트 시스템이 생기면 next.Cost만큼 차감하고, 부족하면 막는다.
             level++;
+            if (bow != null) bow.ClearArrows(); // 이전 단계로 만들어 둔 화살·이펙트는 지운다
             ApplyLevelToBow();
             Refresh();
         }
 
         private void ApplyLevelToBow()
         {
-            if (bow == null || levels.Length == 0) return;
-            bow.MaxArrowSpeed = CurrentLevel.arrowSpeed;
-            bow.ArrowDamage = CurrentLevel.damage;
-            bow.SetVisualLevel(level); // 단계별 활 외형
+            BowUpgradeDef current = CurrentLevel;
+            if (bow == null || current == null) return;
+            bow.MaxArrowSpeed = current.ArrowSpeed;
+            bow.ArrowDamage = current.Damage;
+            bow.ArrowEffect = current.ArrowEffect; // 화살이 맞았을 때 터지는 이펙트 (TSV의 ArrowEffect)
+            bow.SetVisualLevel(current.VisualLevel); // 단계별 활 외형 (TSV의 VisualLevel)
+        }
+
+        /// <summary>" · 효과 이름". 활에 이름이 등록되지 않은 효과면 빈 문자열.</summary>
+        private string EffectText(BowUpgradeDef def)
+        {
+            string name = bow != null ? bow.GetArrowEffectName(def.ArrowEffect) : "";
+            return string.IsNullOrEmpty(name) ? "" : $" · {name}";
         }
 
         private void Refresh()
@@ -124,19 +124,22 @@ namespace ArcherSimulator
                 hintText.text = allowed ? HintDock : HintLocked;
             }
 
-            if (levels.Length == 0) return;
-            BowLevel current = CurrentLevel;
-            if (currentText != null) currentText.text = $"현재  {current.displayName}\n사거리 {current.range:0}m · 데미지 {current.damage}";
-
-            bool maxed = level >= levels.Length - 1;
-            if (nextText != null)
+            BowUpgradeDef current = CurrentLevel;
+            BowUpgradeDef next = table.Get(MaxLevel ? level : level + 1);
+            if (current == null)
             {
-                nextText.text = maxed
-                    ? "최고 단계입니다"
-                    : $"다음  {levels[level + 1].displayName}\n사거리 {levels[level + 1].range:0}m · 데미지 {levels[level + 1].damage} · {levels[level + 1].effect}";
+                if (currentText != null) currentText.text = "강화 데이터 없음";
+                if (nextText != null) nextText.text = "";
+                if (costText != null) costText.text = "";
+                if (upgradeButton != null) upgradeButton.interactable = false;
+                return;
             }
-            if (costText != null) costText.text = maxed ? "" : $"비용 {levels[level + 1].cost:N0} P";
-            if (upgradeButton != null) upgradeButton.interactable = !maxed;
+
+            if (currentText != null) currentText.text = $"현재  {current.DisplayName}\n{current.StatText}";
+            
+            if (nextText != null) nextText.text = MaxLevel ? "최고 단계입니다" : $"다음  {next.DisplayName}\n{next.StatText}{EffectText(next)}";
+            if (costText != null) costText.text = MaxLevel ? "" : $"비용 {next.Cost:N0} P";
+            if (upgradeButton != null) upgradeButton.interactable = !MaxLevel;
         }
     }
 }
