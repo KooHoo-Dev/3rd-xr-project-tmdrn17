@@ -4,7 +4,7 @@ using UnityEngine;
 namespace ArcherSimulator
 {
     /// <summary>
-    /// 화살. 루트 = 오늬(꼬리), +Z = 촉 방향.
+    /// 화살. +Z = 촉 방향. 오늬(꼬리) 위치는 몸통 CapsuleCollider의 뒤 끝 (기본 화살은 루트, 이펙트 화살은 루트 뒤쪽).
     /// 1) ArrowPool이 켜 주면 시위에 걸렸다가 발사된다 (BowController).
     ///    강화 단계 화살 프리팹(Arrow Lv2~)은 화살 모델 대신 이펙트가 화살 몸체다. 시위에 걸 때부터 재생한다.
     /// 2) 땅(ArrowGround)에 닿으면 바로 꺼진다.
@@ -20,6 +20,8 @@ namespace ArcherSimulator
         private ParticleSystem[] effects; // 자식 이펙트 (강화 단계 화살만)
         private Collider[] ownColliders;
         private ArrowState state = ArrowState.Idle;
+        private Vector3 nockLocalPosition; // 루트 기준 오늬(꼬리) 위치
+        private bool effectsPending;       // 시위 위치로 옮긴 뒤 이펙트를 켜야 함
 
         private Transform stuckTo;
         private Vector3 stuckLocalPosition;
@@ -32,6 +34,12 @@ namespace ArcherSimulator
         {
             body = GetComponent<Rigidbody>();
             ownColliders = GetComponentsInChildren<Collider>(true);
+
+            // 오늬(꼬리) 위치 = 화살 몸통 캡슐의 뒤 끝. 기본 화살은 루트가 꼬리(z 0)지만,
+            // 이펙트 화살(Arrow Lv2~)은 루트가 촉이고 몸통이 뒤(-Z)로 뻗어 있어 꼬리가 z -0.83쯤이다.
+            CapsuleCollider shaft = GetComponent<CapsuleCollider>();
+            if (shaft != null && shaft.direction == 2)
+                nockLocalPosition = shaft.center - Vector3.forward * (shaft.height * 0.5f);
 
             // 이펙트가 끝나면 스스로 지워지는 설정(Stop Action: Destroy/Callback)을 꺼서 화살과 함께 재사용한다.
             effects = GetComponentsInChildren<ParticleSystem>(true);
@@ -51,7 +59,11 @@ namespace ArcherSimulator
             stuckTo = null;
             MakeKinematic();
             SetColliders(false);
-            SetEffects(true); // 이펙트가 곧 화살 몸체: 시위에 걸 때부터 처음부터 재생
+            // 이펙트는 아직 켜지 않는다. 지금은 화살 묶음(Arrow Pool) 위치라, 여기서 켜고 시위로 순간이동하면
+            // 월드 공간 파티클(이동 거리만큼 뿜는 불꽃 등)이 그 사이를 따라 쏟아져 뒤로 날아가는 것처럼 보인다.
+            // → 첫 FollowNock에서 시위 위치로 옮긴 뒤에 처음부터 재생한다.
+            SetEffects(false);
+            effectsPending = true;
 
             if (ignore == null) return;
             foreach (Collider other in ignore)
@@ -61,10 +73,15 @@ namespace ArcherSimulator
             }
         }
 
+        /// <summary>화살의 오늬(꼬리)가 시위 위치(position)에 오도록 화살을 놓는다.</summary>
         public void FollowNock(Vector3 position, Quaternion rotation)
         {
             if (state != ArrowState.Nocked) return;
-            transform.SetPositionAndRotation(position, rotation);
+            transform.SetPositionAndRotation(position - rotation * nockLocalPosition, rotation);
+
+            if (!effectsPending) return;
+            effectsPending = false;
+            SetEffects(true); // 이펙트가 곧 화살 몸체: 시위 위치에 놓인 뒤 처음부터 재생
         }
 
         public void Launch(Vector3 velocity)
