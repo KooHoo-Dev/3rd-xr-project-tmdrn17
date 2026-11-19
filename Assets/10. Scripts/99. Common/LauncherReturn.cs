@@ -1,49 +1,32 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
 namespace StudyXR.Common
 {
-    public class LauncherReturn : MonoBehaviour
+    /// <summary>
+    /// 런처 씬(빌드 0번 "Launcher")에서 시작했는지 기억하고, 런처로 돌아가는 기능을 준다.
+    /// 왼손 메뉴 버튼(≡)은 QuitMenu가 받으며, 런처에서 시작했으면 종료 메뉴에 "런처로" 버튼이 나온다.
+    /// </summary>
+    public static class LauncherReturn
     {
         private const string LauncherSceneName = "Launcher";
 
-        private InputAction menuAction;
+        /// <summary>런처에서 시작했는지 (런처로 돌아갈 수 있는지).</summary>
+        public static bool Active { get; private set; }
+
+        /// <summary>지금 런처가 아닌 씬에 있어서 런처로 돌아갈 수 있는지.</summary>
+        public static bool CanReturn => Active && SceneManager.GetActiveScene().buildIndex != 0;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        private static void CreateIfStartedFromLauncher()
+        private static void CheckStartedFromLauncher()
         {
             Scene first = SceneManager.GetActiveScene();
-
-            if (first.buildIndex != 0 || first.name != LauncherSceneName) return;
-
-            var go = new GameObject("Launcher Return");
-            DontDestroyOnLoad(go);
-            go.AddComponent<LauncherReturn>();
+            Active = first.buildIndex == 0 && first.name == LauncherSceneName;
         }
 
-        private void OnEnable()
+        public static void Return()
         {
-            menuAction = new InputAction(
-                "Return To Launcher",
-                InputActionType.Button,
-                "<XRController>{LeftHand}/{MenuButton}");
-            menuAction.performed += OnMenuPressed;
-            menuAction.Enable();
-        }
-
-        private void OnDisable()
-        {
-            if (menuAction == null) return;
-            menuAction.performed -= OnMenuPressed;
-            menuAction.Disable();
-            menuAction.Dispose();
-            menuAction = null;
-        }
-
-        private void OnMenuPressed(InputAction.CallbackContext context)
-        {
-            if (SceneManager.GetActiveScene().buildIndex == 0) return;
+            if (!CanReturn) return;
             SceneManager.LoadScene(0);
         }
     }
