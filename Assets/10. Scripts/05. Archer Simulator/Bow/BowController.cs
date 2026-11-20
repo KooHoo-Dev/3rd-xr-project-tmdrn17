@@ -208,8 +208,7 @@ namespace ArcherSimulator
 
             nockedArrow = arrowPool.Get();
             if (nockedArrow == null) return; // 이번 라운드에 준비된 화살을 다 씀
-            nockedArrow.Nock(bowColliders);
-            FollowNock();
+            nockedArrow.Nock(bowColliders, bowString.NockPosition, NockRotation);
         }
 
         private void OnStringReleased(float pull, IXRSelectInteractor hand)
@@ -249,8 +248,11 @@ namespace ArcherSimulator
         private void FollowNock()
         {
             if (nockedArrow == null || bowString == null) return;
-            nockedArrow.FollowNock(bowString.NockPosition, Quaternion.LookRotation(transform.forward, transform.up));
+            nockedArrow.FollowNock(bowString.NockPosition, NockRotation);
         }
+
+        /// <summary>시위에 걸린 화살의 방향 = 활 앞쪽.</summary>
+        private Quaternion NockRotation => Quaternion.LookRotation(transform.forward, transform.up);
 
         private void ApplyAnimation(float pull)
         {

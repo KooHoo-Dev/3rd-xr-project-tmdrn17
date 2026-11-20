@@ -21,7 +21,7 @@ namespace ArcherSimulator
         private Collider[] ownColliders;
         private ArrowState state = ArrowState.Idle;
         private Vector3 nockLocalPosition; // 루트 기준 오늬(꼬리) 위치
-        private bool effectsPending;       // 시위 위치로 옮긴 뒤 이펙트를 켜야 함
+        private RigidbodyInterpolation flightInterpolation; // 프리팹의 보간 설정 (날아갈 때만 쓴다)
 
         private Transform stuckTo;
         private Vector3 stuckLocalPosition;
@@ -33,6 +33,7 @@ namespace ArcherSimulator
         private void Awake()
         {
             body = GetComponent<Rigidbody>();
+            flightInterpolation = body.interpolation;
             ownColliders = GetComponentsInChildren<Collider>(true);
 
             // 오늬(꼬리) 위치 = 화살 몸통 캡슐의 뒤 끝. 기본 화살은 루트가 꼬리(z 0)지만,
@@ -53,17 +54,29 @@ namespace ArcherSimulator
         // ───────── 발사 ─────────
 
         /// <summary>시위에 건다. 물리·충돌을 끄고, 발사 직후 활에 걸리지 않게 활 Collider와의 충돌을 무시한다.</summary>
-        public void Nock(IEnumerable<Collider> ignore)
+        /// <summary>
+        /// 꺼져 있는 화살을 시위 위치(오늬 = nockPosition)에 먼저 놓은 뒤 켜서 시위에 건다.
+        /// 지난번에 꺼진 자리(표적·땅·화살 묶음)에서 켜고 옮기면, 월드 공간 파티클(이동 거리만큼 뿜는 불꽃 등)이
+        /// 그 사이를 따라 쏟아져 엉뚱한 방향에서 무언가 휙 지나가는 것처럼 보이므로 순서가 중요하다.
+        /// 물리·충돌을 끄고, 발사 직후 활에 걸리지 않게 활 Collider와의 충돌을 무시한다.
+        /// </summary>
+        public void Nock(IEnumerable<Collider> ignore, Vector3 nockPosition, Quaternion rotation)
         {
             state = ArrowState.Nocked;
             stuckTo = null;
+
+            Vector3 position = nockPosition - rotation * nockLocalPosition;
+            transform.SetPositionAndRotation(position, rotation);
+            body.position = position;
+            body.rotation = rotation;
+            gameObject.SetActive(true);
+
             MakeKinematic();
+            // 시위를 따라 Transform으로 옮기는 동안 보간이 켜져 있으면, 화면에는 이전 물리 위치(지난번 꺼진 자리)에서
+            // 끌려오는 것처럼 그려진다. 시위에 걸린 동안은 보간을 끄고, 발사할 때 되돌린다.
+            body.interpolation = RigidbodyInterpolation.None;
             SetColliders(false);
-            // 이펙트는 아직 켜지 않는다. 지금은 화살 묶음(Arrow Pool) 위치라, 여기서 켜고 시위로 순간이동하면
-            // 월드 공간 파티클(이동 거리만큼 뿜는 불꽃 등)이 그 사이를 따라 쏟아져 뒤로 날아가는 것처럼 보인다.
-            // → 첫 FollowNock에서 시위 위치로 옮긴 뒤에 처음부터 재생한다.
-            SetEffects(false);
-            effectsPending = true;
+            SetEffects(true); // 이펙트가 곧 화살 몸체: 시위 위치에서 처음부터 재생
 
             if (ignore == null) return;
             foreach (Collider other in ignore)
@@ -78,10 +91,6 @@ namespace ArcherSimulator
         {
             if (state != ArrowState.Nocked) return;
             transform.SetPositionAndRotation(position - rotation * nockLocalPosition, rotation);
-
-            if (!effectsPending) return;
-            effectsPending = false;
-            SetEffects(true); // 이펙트가 곧 화살 몸체: 시위 위치에 놓인 뒤 처음부터 재생
         }
 
         public void Launch(Vector3 velocity)
@@ -91,6 +100,7 @@ namespace ArcherSimulator
 
             SetColliders(true);
             body.isKinematic = false;
+            body.interpolation = flightInterpolation; // 날아가는 동안은 부드럽게 보이도록 보간
             // 빠른 화살이 얇은 표적을 뚫거나, 몸통·약점에 한 프레임에 같이 닿아 판정이 뒤섞이지 않게
             // 날아가는 동안만 연속 충돌 감지를 쓴다 (먼저 닿은 면 = 앞에 튀어나온 약점이 먼저 잡힌다).
             body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;

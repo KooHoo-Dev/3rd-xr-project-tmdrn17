@@ -42,13 +42,12 @@ namespace ArcherSimulator
             }
         }
 
-        /// <summary>꺼져 있는 화살 하나를 켜서 돌려준다. 남은 화살이 없으면 null.</summary>
+        /// <summary>꺼져 있는 화살 하나를 돌려준다. 켜는 건 Arrow.Nock이 시위 위치로 옮긴 뒤에 한다. 남은 화살이 없으면 null.</summary>
         public Arrow Get()
         {
             foreach (Arrow arrow in arrows)
             {
                 if (arrow.gameObject.activeSelf) continue;
-                arrow.gameObject.SetActive(true);
                 return arrow;
             }
             return null;
