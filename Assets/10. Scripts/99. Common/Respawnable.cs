@@ -1,3 +1,5 @@
+using System;
+using ArcherSimulator;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
@@ -25,6 +27,18 @@ namespace StudyXR.Common
             SetHome(transform.position, transform.rotation);
         }
 
+        // GameManager.Instance는 GameManager.Awake에서 채워지므로, 모든 Awake가 끝난 Start에서 구독한다.
+        // GameManager가 없는 씬(공용 스크립트)에서도 쓰이므로 null이면 건너뛴다.
+        private void Start()
+        {
+            GameManager.Instance.RestartStage += Teleport;
+        }
+
+        private void OnDestroy()
+        {
+            GameManager.Instance.RestartStage -= Teleport;
+        }
+        
         private void SetHome(Vector3 pos, Quaternion rot)
         {
             homePosition = pos;

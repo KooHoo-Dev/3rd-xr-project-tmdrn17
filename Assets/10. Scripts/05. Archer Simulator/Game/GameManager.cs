@@ -95,6 +95,7 @@ namespace ArcherSimulator
 
         public GameState State { get; private set; } = GameState.Lobby;
         public event Action<GameState> StateChanged;
+        public event Action RestartStage;
 
         /// <summary>로비에서만 강화할 수 있다. 게임을 시작하면(Ready·Playing·Result) 막힌다.</summary>
         public bool CanUpgrade => State == GameState.Lobby;
@@ -309,8 +310,17 @@ namespace ArcherSimulator
         {
             if (State != GameState.Result) return;
             if (resultBoard != null) resultBoard.SetActive(false);
-            SetState(GameState.Lobby);
-            StartGame();
+            ReturnToLobby();
+            RestartStage?.Invoke();
+        }
+        
+        public static void Quit()
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
         }
 
         /// <summary>결과 화면 '로비로' (진행 중 취소에도 사용 가능)</summary>
