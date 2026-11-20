@@ -921,7 +921,7 @@ namespace ArcherSimulator.EditorTools
         {
             ("기본 화살", null),
             ("자연의 섬광", PrefabFolder + "/Arrow Lv2.prefab"), // Projectile 1 nature arrow (VFX loop)
-            ("칼날 폭발", PrefabFolder + "/Arrow Lv3.prefab"),   // Projectile 8 dagger (반복 재생)
+            ("푸른 불꽃", PrefabFolder + "/Arrow Lv3.prefab"),   // Projectile 6 blue fire (VFX loop)
             ("용의 일격", PrefabFolder + "/Arrow Lv4.prefab"),   // Projectile dragon punch (VFX loop)
         };
 

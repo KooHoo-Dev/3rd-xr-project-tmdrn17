@@ -511,7 +511,7 @@ MonoBehaviour:
   arrowEffects:
   - displayName: "\uAE30\uBCF8 \uD654\uC0B4"
   - displayName: "\uC790\uC5F0\uC758 \uC12C\uAD11"
-  - displayName: "\uCE7C\uB0A0 \uD3ED\uBC1C"
+  - displayName: "\uD478\uB978 \uBD88\uAF43"
   - displayName: "\uC6A9\uC758 \uC77C\uACA9"
   maxArrowSpeed: 25
   arrowDamage: 40
