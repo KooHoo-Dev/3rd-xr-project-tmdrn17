@@ -295,15 +295,13 @@ namespace ArcherSimulator
 
             SetState(GameState.Result);
 
-            if (resultBoard != null) resultBoard.SetActive(true);
-            if (resultTitleText != null) resultTitleText.text = cleared ? "클리어!" : "실패";
-            if (resultDetailText != null) resultDetailText.text = score.Breakdown(scoreRule);
-            if (resultTotalText != null) resultTotalText.text = $"획득 점수  {total:N0}";
-            if (resultStatsText != null)
-                resultStatsText.text = $"명중률 {accuracy}%  ·  발사 {arrowsFired}발  ·  남은 화살 {arrowsLeft}";
-            if (resultRecordText != null)
-                resultRecordText.text = (newRecord ? $"신기록!  최고 기록 {best:N0}" : $"최고 기록 {best:N0}") +
-                                        $"  ·  +{total:N0} P (보유 {PointWallet.Points:N0} P)";
+            resultBoard.SetActive(true);
+            resultTitleText.SetText(cleared ? "클리어!" : "실패");
+            resultDetailText.SetText(score.Breakdown(scoreRule));
+            resultTotalText.SetText($"획득 점수  {total:N0}");
+            resultStatsText.SetText($"명중률 {accuracy}%  ·  발사 {arrowsFired}발  ·  남은 화살 {arrowsLeft}");
+            resultRecordText.SetText((newRecord ? $"신기록!  최고 기록 {best:N0}" : $"최고 기록 {best:N0}") +
+                                     $"  ·  +{total:N0} P (보유 {PointWallet.Points:N0} P)");
         }
 
         /// <summary>결과 화면 '다시 하기'</summary>
