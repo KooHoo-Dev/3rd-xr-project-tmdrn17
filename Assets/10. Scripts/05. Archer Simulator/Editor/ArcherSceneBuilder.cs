@@ -25,7 +25,7 @@ namespace ArcherSimulator.EditorTools
     ///   XR / Lights / Stage(환경) / Systems  +  Lobby / Range / Game Stages / UI
     /// 메뉴: Archer Simulator > 씬 기본 세팅 (다시 실행하면 빌더가 만든 것만 지우고 새로 만든다)
     /// </summary>
-    public static class ArcherSceneBuilder
+    public static partial class ArcherSceneBuilder
     {
         private const string ScenePath = "Assets/Scenes/Archer Simulator.unity";
         private const string MaterialFolder = "Assets/20. Archer Simulator/Materials";
@@ -42,6 +42,9 @@ namespace ArcherSimulator.EditorTools
         private const string ArrowModelPath = "Assets/Blink/Art/Weapons/Stylized/Bows/_PrefabsBows/ArrowBow1_1.prefab";
         private const string PrefabFolder = "Assets/20. Archer Simulator/Prefabs";
         private const float ArrowLength = 0.8f;
+        private const string AppTitle = "Archer Simulator"; // 앱 이름 (Product Name, 타이틀 씬)
+        private const string MakerName = "김승구";           // 타이틀 씬의 제작자
+        private const string TitleSignName = "Title Sign";  // 예전 로비 타이틀 (타이틀 씬을 만들 때 지운다)
         private const string PushButtonPath = "Assets/Samples/XR Interaction Toolkit/3.5.1/Starter Assets/DemoAssets/Prefabs/Interactables/Push Button.prefab";
 
         // 빌더가 만드는 루트. (이전 버전 이름 포함) — 다시 실행하면 지운다.

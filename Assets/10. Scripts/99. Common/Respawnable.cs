@@ -31,12 +31,13 @@ namespace StudyXR.Common
         // GameManager가 없는 씬(공용 스크립트)에서도 쓰이므로 null이면 건너뛴다.
         private void Start()
         {
-            GameManager.Instance.RestartStage += Teleport;
+            if (GameManager.Instance != null) GameManager.Instance.RestartStage += Teleport;
         }
 
+        // 씬을 닫거나 플레이를 멈출 때는 GameManager가 먼저 파괴돼 Instance가 null일 수 있다.
         private void OnDestroy()
         {
-            GameManager.Instance.RestartStage -= Teleport;
+            if (GameManager.Instance != null) GameManager.Instance.RestartStage -= Teleport;
         }
         
         private void SetHome(Vector3 pos, Quaternion rot)

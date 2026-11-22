@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/Title.unity
+    guid: c0a3ced832edae246811e8d61b94bae3
+  - enabled: 1
     path: Assets/Scenes/Archer Simulator.unity
     guid: 55daccc09a3b69647bbab145b54a3ab3
   m_configObjects:
